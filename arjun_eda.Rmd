@@ -22,7 +22,7 @@ library(dplyr)
 
 ## Importing Data
 
-Import raw data. Selecting data only for O'Hare with all providers. Data is by month by provider, so need to aggregate by month.
+Import raw data. Selecting data for all providers and airlines. Data is by month by provider, so need to aggregate by month.
 
 ```{r cars}
 data <- read.csv('Airline_Delay_Cause.csv')
