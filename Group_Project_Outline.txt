@@ -7,7 +7,7 @@ Group Project Presentation Outline
 		○ Source Information
 		○ Focus on total flights/ total delays for all airlines
 		○ One airport (ORD)
-	• Data Overview
+	• Data Overview 
 		○ Plots of Data / ACF / PACF
 		○ Data Characteristics (MULT / ADD / SEASONALITY)
 		○ KPSS Test for normality
@@ -17,12 +17,12 @@ Group Project Presentation Outline
 		○ Holt Winters
 		○ Seasonal Naïve
 		○ Issue with these models -> delays are a function of flights
-	• Arima Model
+	• Arima Model 
 		○ EACF
 		○ Auto.Arima
 		○ Better prediction but still 'shock' of post covid flight increases
-	• VAR/ARIMA w XREF/etc
-	• Interruption model?
+	• VAR/ARIMA w XREF/etc Adrian+Ethan
+	• Interruption model? Ryan+Arjun
 	• Conclusion
 		○ The incorporation of total_flights as a predictor improved the fit
 Potential for more predictors to be incorporated like weather forecast, airline operations
