@@ -41,7 +41,9 @@ flights = subset(flights, select = -c(date))
 
 flights_ts <- ts(flights, start = c(2003,6), frequency = 12)
 total_flights <- flights_ts[,1]
-total_delays <- flights_ts[,2]
+total_flights_trunc <- ts(flights_ts[1:202,1], start = c(2003,6), frequency = 12)
+total_delays_trunc <- ts(flights_ts[1:202,2], start = c(2003,6), frequency = 12)
+
 ```
 
 ## EDA
@@ -51,6 +53,19 @@ Plot our main time series
 ```{r pressure, echo=FALSE}
 tsdisplay(total_flights)
 tsdisplay(total_delays)
+
+tsdisplay(total_flights_trunc)
+
+total_flights_trunc
 ```
 
+Looking at the ACF and PACF we can see that this is a non-stationary model with both trend and seasonality. Also we can conclude it is an AR model primarily as the ACF decays and PACF drops. Interestingly, the trend is downward and the seanolity is multiplicative, so we may need to apply a box cox transformation. Also there is a clear shock at time 2020,1 where flights dropped fof dramatically.
 
+## Basic Models
+
+Start off with some of the simpler models. Likely to look pretty bad because of the shock for covid. Will try it out arima and ets. I may train the model 
+
+```{r}
+auto.arima(total_flights_trunc)
+
+```
