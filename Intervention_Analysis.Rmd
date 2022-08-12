@@ -1,0 +1,181 @@
+---
+title: "Group Project EDA"
+author: "Arjun Venkatesh"
+date: "2022-08-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE}
+library(fpp)
+library(TSA)
+library(tseries)
+library(ggplot2)
+library(forecast)
+library(TSstudio)
+library(MLmetrics)
+library(vars)
+library(dplyr)
+```
+
+## Importing Data
+
+Import raw data. Selecting data for all providers and airlines. Data is by month by provider, so need to aggregate by month.
+
+```{r cars}
+data <- read.csv('Airline_Delay_Cause.csv')
+data[is.na(data)] <- 0
+
+data$date <- as.Date(paste(data$year,'-',data$month,'-','01', sep = ''))
+
+
+flights <- data %>% group_by(date) %>%
+  summarise(flights = sum(arr_flights), delays = sum(arr_del15), carrier = sum(carrier_ct),
+            weather = sum(weather_ct), nas = sum(nas_ct), security = sum(security_ct), 
+            late_aircraft = sum(late_aircraft_ct), late_aircraft = sum(late_aircraft_ct),
+            cancellation = sum(arr_cancelled), diversions = sum(arr_diverted))
+
+flights = subset(flights, select = -c(date))
+
+flights_ts <- ts(flights, start = c(2003,6), frequency = 12)
+total_flights <- flights_ts[,1]
+total_delays <- flights_ts[,2]
+
+plot(total_delays)
+total_delays
+```
+
+Shocks at August 2008 (63), Jan 2016, Jan 2020.
+
+## EDA
+
+Plot our main time series
+
+```{r pressure, echo=FALSE}
+tsdisplay(total_flights)
+tsdisplay(total_delays)
+```
+
+Looking at the ACF and PACF we can see that this is a non-stationary model with both trend and seasonality. Also we can conclude it is an AR model primarily as the ACF decays and PACF drops. Interestingly, the trend is downward and the seasonality is multiplicative, so we may need to apply a box cox transformation. Also there is a clear shock at time 2020,1 where flights dropped of dramatically.
+
+
+
+## Basic Models
+
+Start off with some of the simpler models. Start off with Arima models on the first section of the data without any shocks and evaluate accuracy on a couple different windows.
+
+```{r}
+train1 <- ts(total_delays[1:48], start = c(2003,6), frequency = 12)
+test1 <- ts(total_delays[49:60], start = c(2007,6), frequency = 12)
+
+train2 <- ts(total_delays[1:132], start = c(2003,6), frequency = 12)
+test2 <- ts(total_delays[133:144], start = c(2014,6), frequency = 12)
+
+train3 <- ts(total_delays[1:180], start = c(2003,6), frequency = 12)
+test3 <- ts(total_delays[181:192], start = c(2018,6), frequency = 12)
+
+train4 <- ts(total_delays[1:216], start = c(2003,6), frequency = 12)
+test4 <- ts(total_delays[217:228], start = c(2021,6), frequency = 12)
+```
+
+### First window model
+
+First window of train test (before 2009 recession). Plotting-there may be an extra shock here.
+
+```{r}
+auto.arima(train1)
+fit1 <- auto.arima(train1)
+forecast1 <- forecast(fit1, h=12)
+accuracy1 <- accuracy(forecast1$mean, test1)
+ts.plot(cbind(train1, test1, ts(forecast1$mean, start = c(2007,6), frequency=12)), lty=1:3)
+
+accuracy(forecast1$mean, test1)
+
+forecast1 <- forecast(fit1, h=12)
+```
+
+
+### Second window model
+
+```{r}
+auto.arima(train2)
+fit2 <- auto.arima(train2)
+forecast2 <- forecast(fit2, h=12)
+accuracy2 <- accuracy(forecast2$mean, test2)
+accuracy2
+
+ts.plot(cbind(train2, test2, forecast2$mean), lty=1:3)
+```
+
+Not a bad forecast! Better than before. However will need to add a pulse intervention possibly in 2009.
+
+```{r}
+intervention1 <- data.frame(Jan2005=1*(seq(train2)==18))
+intervention2 <- data.frame(Aug08 = c(rep(0,62),rep(1,132-62))) 
+
+auto.arima(train2)
+
+fit2_1 = arimax(train2, order = c(0,1,1), seasonal = c(2,0,0), xreg = cbind(intervention1,intervention2))
+
+summary(fit2_2)
+
+plot(train2)
+points(fitted(fit2_1))
+
+plot(train2)
+points(fitted(fit2))
+
+accuracy(fit2_1)
+accuracy(fitted(fit2),train2)
+```
+
+
+```{r}
+fit3 <- auto.arima(train3)
+summary(fit3)
+forecast3 <- forecast(fit3, h=12)
+accuracy3 <- accuracy(forecast3$mean, test3)
+accuracy3
+
+ts.plot(cbind(train3, test3, forecast3$mean), lty=1:3)
+
+
+```
+
+```{r}
+fit4 <- auto.arima(train4)
+summary(fit4)
+forecast4 <- forecast(fit4, h=12)
+accuracy4 <- accuracy(forecast4$mean, test4)
+accuracy4
+
+ts.plot(cbind(train4, test4, forecast4$mean), lty=1:3)
+
+plot(train4)
+points(fitted(fit4))
+```
+```{r}
+fit6 <- auto.arima(total_delays)
+
+accuracy(fit6)
+
+```
+
+```{r warning=FALSE}
+intervention1 <- c(1*(seq(total_delays)==18))
+intervention2 <- c(rep(0,62),rep(1,length(total_delays)-62))
+intervention4 <- c(Jan20=1*(seq(total_delays)==203))
+
+total_delays[200]
+
+fit5 <- arimax(total_delays, order = c(0,1,1), seasonal = c(2,0,2), xtransf = cbind(intervention4), transfer = list(c(1,0)), xreg=(intervention2), method = 'ML')
+
+fit5
+
+plot(total_delays)
+points(fitted(fit5))
+
+```

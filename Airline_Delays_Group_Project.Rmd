@@ -27,7 +27,7 @@ library(TSA)
 Import raw data. Selecting data for all providers and airlines. Data is by month by provider, so need to aggregate by month.
 
 ```{r load}
-data <- read.csv('C:/Users/ethan/OneDrive/Documents/UChicago/Time Series Analysis/Group_Project/BTS_Airline_Delay_Data.csv')
+data <- read.csv('Airline_Delay_Cause.csv')
 data[is.na(data)] <- 0
 data$date <- as.Date(paste(data$year,'-',data$month,'-','01', sep = ''))
 flights <- data %>% group_by(date) %>%
@@ -41,6 +41,8 @@ total_flights <- flights_ts[,1]
 total_delays <- flights_ts[,2]
 total_flights_pre_covid <- window(total_flights, end=2019.99)
 total_delays_pre_covid <- window(total_delays, end=2019.99)
+
+total_delays_pre_covid
 ```
 
 ## EDA
@@ -67,11 +69,12 @@ plot(total_delays)
 
 #1st order difference
 kpss.test(diff(total_delays))
-plot(diff(total_delays))
+plot(diff(total_delays), main = "Difference Order 1")
 #stationary
 
 #2nd order difference
 kpss.test(diff(diff(total_delays)))
+plot(diff(diff(total_delays)))
 #stationary
 ```
 
@@ -220,6 +223,8 @@ post_covid_flights <- window(total_flights, start=2020)
 #forecast
 aa_xref_delays_pre_covid<-forecast(aa_xref_delays_pre_covid,xreg=matrix(post_covid_flights),h=29)
 plot(aa_xref_delays_pre_covid)
+
+ts.plot(cbind(total_delays_pre_covid, total_delays, aa_xref_delays_pre_covid$mean), lty=1:3)
 ```
 
 ## VAR
