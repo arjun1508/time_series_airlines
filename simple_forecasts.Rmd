@@ -55,7 +55,7 @@ total_flights_pre_covid <- window(total_flights, end=2019.99)
 total_delays_pre_covid <- window(total_delays, end=2019.99)
 ```
 
-## Exponential Smoothing
+## Naive Seasonals
 
 
 ```{r}
@@ -79,16 +79,24 @@ forecast1 <- forecast(fit1, h=12)
 accuracy(forecast1, test)
 
 plot(train, main='Actuals vs Fit')
-points(fitted(fit1))
-legend('topright', legend=c('actual','fitted'), lty=c(1,NA), pch = c(NA,1))
+lines(fitted(fit1), col=2, lty=2)
+legend('topright', legend=c('actual','fitted'), lty=c(1,2), col=1:2)
 
 ts.plot(cbind(train, test, forecast1$mean), lty=1:3, col=1:3, main = 'ARIMA')
 legend('topright', legend = c('train','test','forecast'), col=1:3, lty=1:3 )
+
+checkresiduals(fit1)
 
 fit2 <- auto.arima(train_covid)
 forecast2 <- forecast(fit2, h=12)
 accuracy(forecast2, test_covid)
 ts.plot(cbind(train_covid, test_covid, forecast2$mean), lty=1:3)
+
+fit3 <- auto.arima(total_delays)
+forecast3 <- forecast(fit3, h=12)
+accuracy(forecast3)
+plot(total_delays, main='Actuals vs Fit')
+lines(fitted(fit3), col=2, lty=2)
 ```
 
 ## HW Method
@@ -105,5 +113,14 @@ plot(hw_delays_covid)
 accuracy(hw_delays_covid, test_covid)
 ts.plot(cbind(train_covid, test_covid, hw_delays_covid$mean), lty=1:3, col=1:3, main = 'hw')
 legend('topright', legend = c('train','test','forecast'), col=1:3, lty=1:3 )
+```
+
+```{r}
+train_df <- data.frame(rbind(accuracy(snaive_delays, test)[1,],accuracy(hw_delays, test)[1,],accuracy(forecast1, test)[1,]))
+
+test_df <- data.frame(rbind(accuracy(snaive_delays, test)[2,],accuracy(hw_delays, test)[2,],accuracy(forecast1, test)[2,]))
+
+train_df
+test_df
 ```
 
