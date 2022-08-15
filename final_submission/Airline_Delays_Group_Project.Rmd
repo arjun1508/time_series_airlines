@@ -1,0 +1,233 @@
+---
+title: "Group_Project: Team 6"
+output: html_document
+date: '2022-08-15'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Install Packages
+
+```{r, message=FALSE}
+library(fpp)
+library(tseries)
+library(ggplot2)
+library(forecast)
+library(TSstudio)
+library(MLmetrics)
+library(vars)
+library(dplyr)
+library(TSA)
+```
+
+## Importing Data
+
+Import raw data. Selecting data for all providers and airlines. Data is by month by provider, so need to aggregate by month.
+
+```{r load}
+data <- read.csv('C:/Users/ethan/OneDrive/Documents/UChicago/Time Series Analysis/Group_Project/BTS_Airline_Delay_Data.csv')
+data[is.na(data)] <- 0
+data$date <- as.Date(paste(data$year,'-',data$month,'-','01', sep = ''))
+flights <- data %>% group_by(date) %>%
+  summarise(flights = sum(arr_flights), delays = sum(arr_del15), carrier = sum(carrier_ct),
+            weather = sum(weather_ct), nas = sum(nas_ct), security = sum(security_ct), 
+            late_aircraft = sum(late_aircraft_ct), late_aircraft = sum(late_aircraft_ct),
+            cancellation = sum(arr_cancelled), diversions = sum(arr_diverted))
+flights = subset(flights, select = -c(date))
+flights_ts <- ts(flights, start = c(2003,6), frequency = 12)
+total_flights <- flights_ts[,1]
+total_delays <- flights_ts[,2]
+total_flights_pre_covid <- window(total_flights, end=2019.99)
+total_delays_pre_covid <- window(total_delays, end=2019.99)
+
+train <- ts(total_delays[1:187], start = c(2003,6), frequency = 12)
+test <- ts(total_delays[188:200], start = c(2019,1), frequency = 12)
+
+train_flights <- ts(total_flights[1:187], start = c(2003,6), frequency = 12)
+test_flights <- ts(total_flights[188:200], start = c(2019,1), frequency = 12)
+
+train_covid <- ts(total_delays[1:216], start = c(2003,6), frequency = 12)
+test_covid <- ts(total_delays[217:228], start = c(2021,6), frequency = 12)
+
+train_covid_flights <- ts(total_flights[1:216], start = c(2003,6), frequency = 12)
+test_covid_flights <- ts(total_flights[217:228], start = c(2021,6), frequency = 12)
+
+total_flights_post_covid <- window(total_flights, start=2020)
+total_delays_post_covid <- window(total_delays, start=2020)
+```
+
+## EDA
+
+Plot our main time series
+
+```{r 1}
+#all
+tsdisplay(total_flights)
+tsdisplay(total_delays)
+
+#pre_covid
+tsdisplay(total_flights_pre_covid)
+tsdisplay(total_delays_pre_covid)
+```
+
+## KPSS Test
+
+```{r 2}
+#No Differencing
+kpss.test(total_delays)
+plot(total_delays)
+#not stationary
+
+#1st order difference
+kpss.test(diff(total_delays))
+plot(diff(total_delays))
+#stationary
+
+#2nd order difference
+kpss.test(diff(diff(total_delays)))
+#stationary
+```
+
+
+## Seasonal Naive
+
+```{r 4}
+#All
+snaive_delays<-snaive(train_covid, h=12)
+plot(snaive_delays)
+accuracy(snaive_delays, test_covid)
+checkresiduals(snaive_delays)
+#still autocorrelated
+
+#Pre_covid
+snaive_delays_pre_covid<-snaive(train, h=12)
+plot(snaive_delays_pre_covid)
+accuracy(snaive_delays_pre_covid, test)
+checkresiduals(snaive_delays_pre_covid)
+#still autocorrelated
+```
+
+## Holt Winters
+
+```{r 5}
+#all
+hw_delays <- hw(train_covid,seasonal = "multiplicative",h=12)
+plot(hw_delays)
+accuracy(hw_delays, test_covid)
+checkresiduals(hw_delays)
+#still autocorrelated
+
+#pre_covid
+hw_delays_pre_covid <- hw(train,seasonal = "multiplicative",h=12)
+plot(hw_delays_pre_covid)
+accuracy(hw_delays_pre_covid, test)
+checkresiduals(hw_delays_pre_covid)
+#still autocorrelated
+```
+
+
+## Holt Winters (Damped)
+
+```{r 6}
+#all
+hw_delays_damped <- hw(train_covid,seasonal = "multiplicative",h=12,damped=TRUE)
+plot(hw_delays_damped)
+accuracy(hw_delays_damped)
+checkresiduals(hw_delays_damped)
+#still autocorrelated
+
+#pre_covid
+hw_delays_damped_pre_covid <- hw(train,seasonal = "multiplicative",h=12,damped=TRUE)
+plot(hw_delays_damped_pre_covid)
+accuracy(hw_delays_damped_pre_covid)
+checkresiduals(hw_delays_damped_pre_covid)
+#still autocorrelated
+```
+
+## EACF
+
+```{r 7}
+
+#all
+l_delays<-BoxCox.lambda(train_covid)
+eacf(BoxCox(train_covid,l_delays))
+
+#pre_covid
+l_delays<-BoxCox.lambda(train)
+eacf(BoxCox(train,l_delays))
+```
+
+## ARIMA
+```{r 8}
+l_delays<-BoxCox.lambda(train)
+fit1 <- auto.arima(train, l=l_delays)
+forecast1 <- forecast(fit1, h=12)
+summary(fit1)
+accuracy(forecast1, test)
+plot(train, main='Actuals vs Fit')
+lines(fitted(fit1),col = "red", lty=2)
+legend('topright', legend=c('actual','fitted'), lty=c(1,2), col=c("black", "red"))
+ts.plot(cbind(train, test, forecast1$mean), lty=1:3, col=1:3, main = 'ARIMA W/ XREG (Total Flights)')
+legend('topright', legend = c('train','test','forecast'), col=1:3, lty=1:3)
+
+checkresiduals(fit1)
+shapiro.test(fit1$residuals)
+```
+
+## ARIMA W/ XREG (Pre Covid)
+```{r 9}
+l_delays<-BoxCox.lambda(train)
+fit2 <- auto.arima(train, xreg=train_flights, l=l_delays)
+forecast2 <- forecast(fit1, xreg=test_flights, h=12)
+summary(fit2)
+accuracy(forecast2, test)
+plot(train, main='Actuals vs Fit')
+lines(fitted(fit2),col = "red", lty=2)
+legend('topright', legend=c('actual','fitted'), lty=c(1,2), col=c("black", "red"))
+ts.plot(cbind(train, test, forecast2$mean), lty=1:3, col=1:3, main = 'ARIMA W/ XREG (Total Flights)')
+legend('topright', legend = c('train','test','forecast'), col=1:3, lty=1:3)
+
+checkresiduals(fit2)
+shapiro.test(fit2$residuals)
+```
+
+## VAR
+
+```{r 10}
+#A. all
+var_delays <- VAR(cbind(train, train_flights), p=10, type ='both', season=12)
+summary(var_delays)
+
+#forecast
+var_delays_fcst<-forecast(train, h=12)
+plot(var_delays_fcst)
+
+#acf
+acf(residuals(var_delays))
+
+#serial test
+serial.test(var_delays, lags.pt=10,type='PT.asymptotic')
+
+```
+
+
+## ARIMA W/ XREG (Covid-Era)
+```{r 11}
+l_delays<-BoxCox.lambda(total_delays_post_covid)
+
+fit3 <- auto.arima(total_delays_pre_covid, xreg=total_flights_pre_covid, l=l_delays)
+forecast3 <- forecast(fit3, xreg=total_flights_post_covid, h=24)
+
+accuracy(forecast3, total_delays_post_covid)
+
+autoplot(forecast3)
+
+ts.plot(cbind(total_delays_pre_covid, total_delays_post_covid, forecast3$mean), lty=1:3, col=1:3, main = 'ARIMA W/ XREG (Total Delays)')
+legend('bottomleft', legend = c('train','test','forecast'), col=1:3, lty=1:3)
+
+checkresiduals(fit3)
+shapiro.test(fit3$residuals)
+```
+
